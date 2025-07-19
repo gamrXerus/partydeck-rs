@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::app::PartyConfig;
 use crate::game::Game;
-use crate::handler::*;
+use crate::handler::*; 
 use crate::input::*;
 use crate::instance::*;
 use crate::launch::Game::{ExecRef, HandlerRef};
@@ -68,11 +68,11 @@ pub fn launch_cmd(
             "{}",
             e.path()
                 .parent()
-                .ok_or_else(|| "Invalid path")?
+                .ok_or_else(|| "Invalid path")? 
                 .to_string_lossy()
         ),
         HandlerRef(h) => match h.symlink_dir {
-            true => &format!("{party}/gamesyms/{}", h.uid),
+            true => &format!( "{party}/gamesyms/{}", h.uid),
             false => &get_rootpath_handler(&h)?,
         },
     };
@@ -110,7 +110,7 @@ pub fn launch_cmd(
             if !h.dll_overrides.is_empty() {
                 cmd.push_str("WINEDLLOVERRIDES=\"");
                 for dll in &h.dll_overrides {
-                    cmd.push_str(&format!("{dll},"));
+                    cmd.push_str(&format!( "{dll},"));
                 }
                 cmd.push_str("=n,b\" ");
             }
@@ -123,14 +123,12 @@ pub fn launch_cmd(
 
     let runtime = match win {
         // UMU CHANGE
-        true => &format!("{}", BIN_UMU_RUN.to_string_lossy()),
+        true => &format!( "{}", BIN_UMU_RUN.to_string_lossy()),
         false => {
             if let HandlerRef(h) = game {
                 match h.runtime.as_str() {
-                    "scout" => &format!("\"{steam}/ubuntu12_32/steam-runtime/run.sh\""),
-                    "soldier" => &format!(
-                        "\"{steam}/steamapps/common/SteamLinuxRuntime_soldier/_v2-entry-point\""
-                    ),
+                    "scout" => &format!( "\"{steam}/ubuntu12_32/steam-runtime/run.sh\""),
+                    "soldier" => &format!( "\"{steam}/steamapps/common/SteamLinuxRuntime_soldier/_v2-entry-point\""),
                     _ => "",
                 }
             } else {
@@ -160,21 +158,21 @@ pub fn launch_cmd(
         }
     }
 
-    cmd.push_str(&format!("cd \"{gamedir}\"; "));
+    cmd.push_str(&format!( "cd \"{gamedir}\"; "));
 
     for (i, instance) in instances.iter().enumerate() {
-        let path_prof = &format!("{party}/profiles/{}", instance.profname.as_str());
+        let path_prof = &format!( "{party}/profiles/{}", instance.profname.as_str());
         let path_save = match game {
             ExecRef(_) => "",
-            HandlerRef(h) => &format!("{path_prof}/saves/{}", h.uid.as_str()),
+            HandlerRef(h) => &format!( "{path_prof}/saves/{}", h.uid.as_str()),
         };
 
         let pfx = match cfg.proton_separate_pfxs {
-            true => &format!("{party}/pfx{}", i + 1),
-            false => &format!("{party}/pfx"),
+            true => &format!( "{party}/pfx{}", i + 1),
+            false => &format!( "{party}/pfx"),
         };
         if win {
-            cmd.push_str(&format!("WINEPREFIX={pfx} "));
+            cmd.push_str(&format!( "WINEPREFIX={pfx} "));
         }
 
         let (gsc_width, gsc_height) = (instance.width, instance.height);
@@ -185,9 +183,16 @@ pub fn launch_cmd(
         };
 
         let gamescope = match cfg.kbm_support {
-            true => &format!("{}", BIN_GSC_KBM.to_string_lossy()),
+            true => &format!( "{}", BIN_GSC_KBM.to_string_lossy()),
             false => "gamescope",
         };
+
+        if cfg.enable_cpu_affinity {
+            let affinity_cores: Vec<&str> = cfg.cpu_affinity_pattern.split(';').collect();
+            if let Some(cores) = affinity_cores.get(i) {
+                cmd.push_str(&format!( "taskset -c {} ", cores));
+            }
+        }
 
         cmd.push_str(&format!(
             "{gamescope} -W {gsc_width} -H {gsc_height} {gsc_sdl} "
@@ -207,7 +212,7 @@ pub fn launch_cmd(
                 if input_devices[*d].device_type == DeviceType::Keyboard
                     || input_devices[*d].device_type == DeviceType::Mouse
                 {
-                    kbms.push_str(&format!("{},", input_devices[*d].path));
+                    kbms.push_str(&format!( ",", input_devices[*d].path));
                 }
             }
 
@@ -218,11 +223,11 @@ pub fn launch_cmd(
                 cmd.push_str("--backend-disable-mouse ");
             }
             if !kbms.is_empty() {
-                cmd.push_str(&format!("--libinput-hold-dev {} ", kbms));
+                cmd.push_str(&format!( "--libinput-hold-dev {} ", kbms));
             }
         }
 
-        cmd.push_str(&format!("-- "));
+        cmd.push_str(&format!( "-- "));
 
         cmd.push_str(&format!(
             "bwrap --die-with-parent --dev-bind / / --tmpfs /tmp "
@@ -237,7 +242,7 @@ pub fn launch_cmd(
                 || (!instance.devices.contains(&d) && dev.device_type == DeviceType::Gamepad)
             {
                 let path = &dev.path;
-                binds.push_str(&format!("--bind /dev/null {path} "));
+                binds.push_str(&format!( "--bind /dev/null {path} "));
             }
         }
 
@@ -249,7 +254,7 @@ pub fn launch_cmd(
                 ));
             }
             if h.win {
-                let path_windata = format!("{pfx}/drive_c/users/steamuser/");
+                let path_windata = format!( "{pfx}/drive_c/users/steamuser/");
                 if h.win_unique_appdata {
                     binds.push_str(&format!(
                         "--bind \"{path_save}/_AppData\" \"{path_windata}/AppData\" "
@@ -262,7 +267,7 @@ pub fn launch_cmd(
                 }
             } else {
                 if h.linux_unique_localshare {
-                    binds.push_str(&format!("--bind \"{path_save}/_share\" \"{localshare}\" "));
+                    binds.push_str(&format!( "--bind \"{path_save}/_share\" \"{localshare}\" "));
                 }
                 if h.linux_unique_config {
                     binds.push_str(&format!(
@@ -282,18 +287,18 @@ pub fn launch_cmd(
                 .args
                 .iter()
                 .map(|arg| match arg.as_str() {
-                    "$GAMEDIR" => format!(" \"{gamedir}\""),
-                    "$PROFILE" => format!(" \"{}\"", instance.profname.as_str()),
-                    "$WIDTH" => format!(" {gsc_width}"),
-                    "$HEIGHT" => format!(" {gsc_height}"),
-                    "$WIDTHXHEIGHT" => format!(" \"{gsc_width}x{gsc_height}\""),
-                    _ => format!(" {arg}"),
+                    "$GAMEDIR" => format!( " \"{gamedir}\"", ),
+                    "$PROFILE" => format!( " \"{}\"", instance.profname.as_str()),
+                    "$WIDTH" => format!( " {gsc_width}"),
+                    "$HEIGHT" => format!( " {gsc_height}"),
+                    "$WIDTHXHEIGHT" => format!( " \"{gsc_width}x{gsc_height}\"", ),
+                    _ => format!( " {arg}"),
                 })
                 .collect::<String>(),
             ExecRef(e) => e.args.clone().sanitize_path(),
         };
 
-        cmd.push_str(&format!("{binds} {runtime} \"{gamedir}/{exec}\" {args} "));
+        cmd.push_str(&format!( "{binds} {runtime} \"{gamedir}/{exec}\" {args} "));
 
         if i < instances.len() - 1 {
             // Proton games need a ~5 second buffer in-between launches
