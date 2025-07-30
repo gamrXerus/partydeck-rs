@@ -2,6 +2,7 @@ mod app;
 mod game;
 mod handler;
 mod input;
+mod instance;
 mod launch;
 mod paths;
 mod util;
@@ -92,7 +93,7 @@ fn main() -> eframe::Result {
     let light = !exec.is_empty();
 
     let win_width = match light {
-        true => 720.0,
+        true => 900.0,
         false => 1080.0,
     };
 
