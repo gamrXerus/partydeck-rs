@@ -44,7 +44,11 @@ You'll need to install KDE Plasma, Gamescope, and Bubblewrap using your distro's
 
 On first launch, the app will automatically download UMU Launcher and Goldberg Steam Emu. This may take a while depending on your download speed, but it only needs to be done once.
 
-Once in the main menu, click the + button to add a handler. Create profiles if you want to store save data, and have a look through the settings menu. To set CPU Affinity go to Settings, Gamescope and Enable CPU Affinity. The Affinity Pattern for an 8 core 16 thread CPU can be 0,1,8,9;2,3,10,11;4,5,12,13;6,7,14,15 for example if you want 2 cores for each instance.
+Once in the main menu, click the + button to add a handler. Create profiles if you want to store save data, and have a look through the settings menu. 
+
+### Configure CPU Settings
+
+To set CPU Affinity go to Settings, Gamescope and Enable CPU Affinity. The Affinity Pattern for an 8 core 16 thread CPU can be 0,1,8,9;2,3,10,11;4,5,12,13;6,7,14,15 for example if you want 2 cores for each instance.
 
 ## Building
 
