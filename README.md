@@ -29,6 +29,7 @@ A split-screen game launcher for Linux/SteamOS
 ## Installing & Usage
 
 Download the latest release [here](https://github.com/wunnr/partydeck-rs/releases) and extract it into a folder. Download game handlers [here](https://drive.proton.me/urls/D9HBKM18YR#zG8XC8yVy9WL).
+Set CPU Affinity if you have performance issues. For example on an 8 core 16 thread CPU set it to: 0,1,8,9;2,3,10,11;4,5,12,13;6,7,14,15
 
 ### SteamOS
 
@@ -51,7 +52,7 @@ Clone the repo with submodules by running `git clone --recurse-submodules https:
 ```
 git submodule update --init
 meson setup build/
-ninja -C build/
+meson setup build -Denable_openvr_support=false
 build/gamescope -- <game>
 ```
 
