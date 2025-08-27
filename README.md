@@ -51,7 +51,7 @@ Clone the repo with submodules by running `git clone --recurse-submodules https:
 
 ```
 git submodule update --init
-meson setup build -Denable_openvr_support=false
+meson setup build -Denable_openvr_support=false -Dwlroots:renderers=vulkan -Dwlroots:backends=drm,libinput -Dwlroots:allocators=gbm
 ninja -C build/
 build/gamescope -- <game>
 ```
