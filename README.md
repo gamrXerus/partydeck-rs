@@ -51,8 +51,8 @@ Clone the repo with submodules by running `git clone --recurse-submodules https:
 
 ```
 git submodule update --init
-meson setup build/
 meson setup build -Denable_openvr_support=false
+ninja -C build/
 build/gamescope -- <game>
 ```
 
