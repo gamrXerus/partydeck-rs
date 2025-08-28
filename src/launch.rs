@@ -212,7 +212,7 @@ pub fn launch_cmd(
                 if input_devices[*d].device_type == DeviceType::Keyboard
                     || input_devices[*d].device_type == DeviceType::Mouse
                 {
-                    kbms.push_str(&format!( ",", input_devices[*d].path));
+                    kbms.push_str(&format!( ",{}", input_devices[*d].path));
                 }
             }
 
