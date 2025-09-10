@@ -20,10 +20,6 @@ impl PartyApp {
         ui.heading("Welcome to PartyDeck");
         ui.separator();
         ui.label("Press SELECT/BACK or Tab to unlock gamepad navigation.");
-        ui.hyperlink_to(
-            "Download game handlers here",
-            "https://drive.proton.me/urls/D9HBKM18YR#zG8XC8yVy9WL",
-        );
         ui.label("PartyDeck is in the very early stages of development; as such, you will likely encounter bugs, issues, and strange design decisions.");
         ui.label("For debugging purposes, it's recommended to read terminal output (stdout) for further information on errors.");
         ui.label("If you have found this software useful, consider donating to support further development!");
@@ -207,10 +203,10 @@ impl PartyApp {
 
         ui.separator();
 
-        let mut devices_to_remove: Vec<(usize,usize)> = Vec::new();
+        let mut devices_to_remove: Vec<(usize, usize)> = Vec::new();
         for (i, instance) in &mut self.instances.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                ui.label(format!("Instance {}", i + 1));
+                ui.label(format!("{}", i + 1));
 
                 if let HandlerRef(_) = cur_game!(self) {
                     ui.label("👤");
@@ -219,6 +215,16 @@ impl PartyApp {
                         &mut instance.profselection,
                         self.profiles.len(),
                         |i| self.profiles[i].clone(),
+                    );
+                }
+
+                if self.options.gamescope_sdl_backend {
+                    ui.label("🖵");
+                    egui::ComboBox::from_id_salt(format!("monitors{i}")).show_index(
+                        ui,
+                        &mut instance.monitor,
+                        self.monitors.len(),
+                        |i| self.monitors[i].name(),
                     );
                 }
 
@@ -259,19 +265,21 @@ impl PartyApp {
         }
 
         if self.instances.len() > 0 {
-            ui.separator();
-            ui.horizontal(|ui| {
-                ui.add(
-                    egui::Image::new(egui::include_image!("../../res/BTN_START.png"))
-                        .max_height(16.0),
-                );
-                ui.add(
-                    egui::Image::new(egui::include_image!("../../res/BTN_START_PS5.png"))
-                        .max_height(16.0),
-                );
-                if ui.button("Start").clicked() {
-                    self.prepare_game_launch();
-                }
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::Image::new(egui::include_image!("../../res/BTN_START.png"))
+                            .max_height(16.0),
+                    );
+                    ui.add(
+                        egui::Image::new(egui::include_image!("../../res/BTN_START_PS5.png"))
+                            .max_height(16.0),
+                    );
+                    if ui.button("Start").clicked() {
+                        self.prepare_game_launch();
+                    }
+                });
+                ui.separator();
             });
         }
     }
@@ -281,7 +289,7 @@ impl PartyApp {
 
         let enable_kwin_script_check = ui.checkbox(
             &mut self.options.enable_kwin_script,
-            "Automatically resize/reposition instances",
+            "(KDE) Automatically resize/reposition instances using KWin script",
         );
 
         let vertical_two_player_check = ui.checkbox(
@@ -348,7 +356,7 @@ impl PartyApp {
         if proton_separate_pfxs_check.hovered() {
             self.infotext = "Runs each instance in its own Proton prefix. If unsure, leave this unchecked. This option will take up more space on the disk, but may also help with certain Proton-related issues such as only one instance of a game starting.".to_string();
         }
-        
+
         let allow_multiple_instances_on_same_device_check = ui.checkbox(
             &mut self.options.allow_multiple_instances_on_same_device,
             "Allow multiple instances on the same device",
@@ -429,7 +437,7 @@ impl PartyApp {
             self.infotext = "Many games have graphical problems or even crash when running at resolutions below 600p. If this is enabled, any instances below 600p will automatically be resized before launching.".to_string();
         }
         if gamescope_sdl_backend_check.hovered() {
-            self.infotext = "Runs gamescope sessions using the SDL backend. If unsure, leave this checked. If gamescope sessions only show a black screen or give an error (especially on Nvidia + Wayland), try disabling this.".to_string();
+            self.infotext = "Runs gamescope sessions using the SDL backend. This is required for multi-monitor support. If unsure, leave this checked. If gamescope sessions only show a black screen or give an error (especially on Nvidia + Wayland), try disabling this.".to_string();
         }
         if kbm_support_check.hovered() {
             self.infotext = "Runs a custom Gamescope build with support for holding keyboards and mice. If you want to use your own Gamescope installation, uncheck this.".to_string();

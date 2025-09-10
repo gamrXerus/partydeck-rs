@@ -5,6 +5,7 @@ use crate::game::*;
 use crate::input::*;
 use crate::instance::*;
 use crate::launch::launch_game;
+use crate::monitor::Monitor;
 use crate::util::*;
 
 use std::path::PathBuf;
@@ -23,6 +24,7 @@ pub struct LightPartyApp {
     pub cur_page: MenuPage,
     pub infotext: String,
 
+    pub monitors: Vec<Monitor>,
     pub input_devices: Vec<InputDevice>,
     pub instances: Vec<Instance>,
     pub instance_add_dev: Option<usize>,
@@ -35,7 +37,7 @@ pub struct LightPartyApp {
 }
 
 impl LightPartyApp {
-    pub fn new_lightapp(exec: String, execargs: String) -> Self {
+    pub fn new(exec: String, execargs: String, monitors: Vec<Monitor>) -> Self {
         let options = load_cfg();
         let input_devices = scan_input_devices(&options.pad_filter_type);
         // placeholder, user should define this
@@ -43,6 +45,7 @@ impl LightPartyApp {
             options,
             cur_page: MenuPage::Instances,
             infotext: String::new(),
+            monitors,
             input_devices,
             instances: Vec::new(),
             instance_add_dev: None,
@@ -163,13 +166,15 @@ impl LightPartyApp {
                         continue;
                     }
                     if !self.options.allow_multiple_instances_on_same_device
-                        && self.is_device_in_any_instance(i) {
+                        && self.is_device_in_any_instance(i)
+                    {
                         continue;
                     }
                     // Prevent same keyboard/mouse device in multiple instances due to current custom gamescope limitations
                     // TODO: Remove this when custom gamescope supports the same keyboard/mouse device for multiple instances
                     if self.input_devices[i].device_type() != DeviceType::Gamepad
-                        && self.is_device_in_any_instance(i) {
+                        && self.is_device_in_any_instance(i)
+                    {
                         continue;
                     }
 
@@ -179,14 +184,16 @@ impl LightPartyApp {
                             if !self.is_device_in_instance(inst, i) {
                                 self.instance_add_dev = None;
                                 self.instances[inst].devices.push(i);
+                            } else {
+                                continue;
                             }
-                            else { continue; }
                         }
                         None => {
                             self.instances.push(Instance {
                                 devices: vec![i],
                                 profname: String::new(),
                                 profselection: 0,
+                                monitor: 0,
                                 width: 0,
                                 height: 0,
                             });
@@ -266,7 +273,8 @@ impl LightPartyApp {
     }
 
     pub fn remove_device_instance(&mut self, instance_index: usize, dev: usize) {
-        let device_index = self.instances[instance_index].devices
+        let device_index = self.instances[instance_index]
+            .devices
             .iter()
             .position(|device| device == &dev);
 
@@ -280,7 +288,15 @@ impl LightPartyApp {
     }
 
     pub fn prepare_game_launch(&mut self) {
-        set_instance_resolutions(&mut self.instances, &self.options);
+        if self.options.gamescope_sdl_backend {
+            set_instance_resolutions_multimonitor(
+                &mut self.instances,
+                &self.monitors,
+                &self.options,
+            );
+        } else {
+            set_instance_resolutions(&mut self.instances, &self.monitors[0], &self.options);
+        }
 
         let game = self.game.to_owned();
         let instances = self.instances.clone();
@@ -294,7 +310,7 @@ impl LightPartyApp {
             move || {
                 sleep(std::time::Duration::from_secs(2));
                 if let Err(err) = launch_game(&game, &dev_infos, &instances, &cfg) {
-                    println!("{}", err);
+                    println!("[partydeck] Error: {}", err);
                     msg("Launch Error", &format!("{err}"));
                 }
                 std::process::exit(0);
@@ -390,7 +406,7 @@ impl LightPartyApp {
 
         let enable_kwin_script_check = ui.checkbox(
             &mut self.options.enable_kwin_script,
-            "Automatically resize/reposition instances",
+            "(KDE) Automatically resize/reposition instances using KWin script",
         );
 
         let vertical_two_player_check = ui.checkbox(
@@ -483,7 +499,7 @@ impl LightPartyApp {
             self.infotext = "Many games have graphical problems or even crash when running at resolutions below 600p. If this is enabled, any instances below 600p will automatically be resized before launching.".to_string();
         }
         if gamescope_sdl_backend_check.hovered() {
-            self.infotext = "Runs gamescope sessions using the SDL backend. If unsure, leave this checked. If gamescope sessions only show a black screen or give an error (especially on Nvidia + Wayland), try disabling this.".to_string();
+            self.infotext = "Runs gamescope sessions using the SDL backend. This is required for multi-monitor support. If unsure, leave this checked. If gamescope sessions only show a black screen or give an error (especially on Nvidia + Wayland), try disabling this.".to_string();
         }
         if kbm_support_check.hovered() {
             self.infotext = "Runs a custom Gamescope build with support for holding keyboards and mice. If you want to use your own Gamescope installation, uncheck this.".to_string();
@@ -535,10 +551,20 @@ impl LightPartyApp {
 
         ui.separator();
 
-        let mut devices_to_remove: Vec<(usize,usize)> = Vec::new();
+        let mut devices_to_remove: Vec<(usize, usize)> = Vec::new();
         for (i, instance) in &mut self.instances.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                ui.label(format!("Instance {}", i + 1));
+                ui.label(format!("👤{}", i + 1));
+
+                if self.options.gamescope_sdl_backend {
+                    ui.label("🖵");
+                    egui::ComboBox::from_id_salt(format!("monitors{i}")).show_index(
+                        ui,
+                        &mut instance.monitor,
+                        self.monitors.len(),
+                        |i| self.monitors[i].name(),
+                    );
+                }
 
                 if self.instance_add_dev == None {
                     if ui.button("➕ Invite New Device").clicked() {
@@ -577,19 +603,21 @@ impl LightPartyApp {
         }
 
         if self.instances.len() > 0 {
-            ui.separator();
-            ui.horizontal(|ui| {
-                ui.add(
-                    egui::Image::new(egui::include_image!("../../res/BTN_START.png"))
-                        .max_height(16.0),
-                );
-                ui.add(
-                    egui::Image::new(egui::include_image!("../../res/BTN_START_PS5.png"))
-                        .max_height(16.0),
-                );
-                if ui.button("Start").clicked() {
-                    self.prepare_game_launch();
-                }
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::Image::new(egui::include_image!("../../res/BTN_START.png"))
+                            .max_height(16.0),
+                    );
+                    ui.add(
+                        egui::Image::new(egui::include_image!("../../res/BTN_START_PS5.png"))
+                            .max_height(16.0),
+                    );
+                    if ui.button("Start").clicked() {
+                        self.prepare_game_launch();
+                    }
+                });
+                ui.separator();
             });
         }
     }

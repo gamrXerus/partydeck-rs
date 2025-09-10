@@ -51,9 +51,18 @@ impl PartyApp {
                 ui.hyperlink_to(version_label, "https://github.com/wunnr/partydeck/releases");
                 ui.add(egui::Separator::default().vertical());
                 ui.hyperlink_to(
-                    "Open Source Licenses",
+                    "Licenses",
                     "https://github.com/wunnr/partydeck/tree/main?tab=License-2-ov-file",
                 );
+                ui.add(egui::Separator::default().vertical());
+                ui.hyperlink_to(
+                    "Handlers",
+                    "https://drive.proton.me/urls/D9HBKM18YR#zG8XC8yVy9WL",
+                );
+                ui.add(egui::Separator::default().vertical());
+                ui.hyperlink_to("Donate", "https://ko-fi.com/wunner");
+                ui.add(egui::Separator::default().vertical());
+                ui.hyperlink_to("GitHub", "https://github.com/wunnr/partydeck");
             });
         });
     }
@@ -65,7 +74,7 @@ impl PartyApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("➕").clicked() {
                     if let Err(err) = add_game() {
-                        println!("Couldn't add game: {err}");
+                        println!("[partydeck] Couldn't add game: {err}");
                         msg("Error", &format!("Couldn't add game: {err}"));
                     }
                     let dir_tmp = PATH_PARTY.join("tmp");
@@ -169,11 +178,11 @@ impl PartyApp {
                 };
 
                 let popup_id = ui.make_persistent_id(format!("gamectx{}", i));
-                egui::popup::popup_below_widget(
+                egui::old_popup::popup_below_widget(
                     ui,
                     popup_id,
                     &btn,
-                    egui::popup::PopupCloseBehavior::CloseOnClick,
+                    egui::PopupCloseBehavior::CloseOnClick,
                     |ui| {
                         if ui.button("Remove").clicked() {
                             if yesno(
@@ -181,7 +190,7 @@ impl PartyApp {
                                 &format!("Are you sure you want to remove {}?", game.name()),
                             ) {
                                 if let Err(err) = remove_game(&self.games[i]) {
-                                    println!("Failed to remove game: {}", err);
+                                    println!("[partydeck] Failed to remove game: {}", err);
                                     msg("Error", &format!("Failed to remove game: {}", err));
                                 }
                             }

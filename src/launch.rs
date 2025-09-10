@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::app::PartyConfig;
 use crate::game::Game;
-use crate::handler::*; 
+use crate::handler::*;
 use crate::input::*;
 use crate::instance::*;
 use crate::launch::Game::{ExecRef, HandlerRef};
@@ -25,8 +25,16 @@ pub fn launch_game(
         }
     }
 
+    println!("\n[partydeck] Instances:");
+    for instance in instances {
+        println!(
+            "  - Profile: {}, Monitor: {}, Resolution: {}x{}",
+            instance.profname, instance.monitor, instance.width, instance.height
+        );
+    }
+
     let cmd = launch_cmd(game, input_devices, instances, cfg)?;
-    println!("\nCOMMAND:\n{}\n", cmd);
+    println!("\n[partydeck] LAUNCH COMMAND:\n{}\n", cmd);
 
     if cfg.enable_kwin_script {
         let script = if instances.len() == 2 && cfg.vertical_two_player {
@@ -39,9 +47,9 @@ pub fn launch_game(
     }
 
     std::process::Command::new("sh")
-        .arg("-c")
-        .arg(cmd)
-        .status()?;
+    .arg("-c")
+    .arg(cmd)
+    .status()?;
 
     if cfg.enable_kwin_script {
         kwin_dbus_unload_script()?;
@@ -67,9 +75,9 @@ pub fn launch_cmd(
         ExecRef(e) => &format!(
             "{}",
             e.path()
-                .parent()
-                .ok_or_else(|| "Invalid path")? 
-                .to_string_lossy()
+            .parent()
+            .ok_or_else(|| "Invalid path")?
+            .to_string_lossy()
         ),
         HandlerRef(h) => match h.symlink_dir {
             true => &format!( "{party}/gamesyms/{}", h.uid),
@@ -151,11 +159,11 @@ pub fn launch_cmd(
             return Err("Steam Scout Runtime not found".into());
         } else if h.runtime == "soldier"
             && !PATH_STEAM
-                .join("steamapps/common/SteamLinuxRuntime_soldier")
-                .exists()
-        {
-            return Err("Steam Soldier Runtime not found".into());
-        }
+            .join("steamapps/common/SteamLinuxRuntime_soldier")
+            .exists()
+            {
+                return Err("Steam Soldier Runtime not found".into());
+            }
     }
 
     cmd.push_str(&format!( "cd \"{gamedir}\"; "));
@@ -175,13 +183,6 @@ pub fn launch_cmd(
             cmd.push_str(&format!( "WINEPREFIX={pfx} "));
         }
 
-        let (gsc_width, gsc_height) = (instance.width, instance.height);
-
-        let gsc_sdl = match cfg.gamescope_sdl_backend {
-            true => "--backend=sdl",
-            false => "",
-        };
-
         let gamescope = match cfg.kbm_support {
             true => &format!( "{}", BIN_GSC_KBM.to_string_lossy()),
             false => "gamescope",
@@ -195,8 +196,14 @@ pub fn launch_cmd(
         }
 
         cmd.push_str(&format!(
-            "{gamescope} -W {gsc_width} -H {gsc_height} {gsc_sdl} "
+            "{gamescope} -W {} -H {} ",
+            instance.width, instance.height
         ));
+
+        if cfg.gamescope_sdl_backend {
+            cmd.push_str("--backend=sdl ");
+            cmd.push_str(&format!("--display-index {} ", instance.monitor));
+        }
 
         if cfg.kbm_support {
             let mut instance_has_keyboard = false;
@@ -211,9 +218,9 @@ pub fn launch_cmd(
                 }
                 if input_devices[*d].device_type == DeviceType::Keyboard
                     || input_devices[*d].device_type == DeviceType::Mouse
-                {
-                    kbms.push_str(&format!( ",{}", input_devices[*d].path));
-                }
+                    {
+                        kbms.push_str(&format!( ",{}", input_devices[*d].path));
+                    }
             }
 
             if instance_has_keyboard {
@@ -240,10 +247,10 @@ pub fn launch_cmd(
         for (d, dev) in input_devices.iter().enumerate() {
             if !dev.enabled
                 || (!instance.devices.contains(&d) && dev.device_type == DeviceType::Gamepad)
-            {
-                let path = &dev.path;
-                binds.push_str(&format!( "--bind /dev/null {path} "));
-            }
+                {
+                    let path = &dev.path;
+                    binds.push_str(&format!( "--bind /dev/null {path} "));
+                }
         }
 
         if let HandlerRef(h) = game {
@@ -267,7 +274,9 @@ pub fn launch_cmd(
                 }
             } else {
                 if h.linux_unique_localshare {
-                    binds.push_str(&format!( "--bind \"{path_save}/_share\" \"{localshare}\" "));
+                    binds.push_str(&format!("--bind \"{path_save}/_share\" \"{localshare}\" "));
+                    binds.push_str(&format!("--bind {party} {party} "));
+                    binds.push_str(&format!("--bind {steam} {steam} "));
                 }
                 if h.linux_unique_config {
                     binds.push_str(&format!(
@@ -284,17 +293,17 @@ pub fn launch_cmd(
 
         let args = match game {
             HandlerRef(h) => h
-                .args
-                .iter()
-                .map(|arg| match arg.as_str() {
-                    "$GAMEDIR" => format!( " \"{gamedir}\"", ),
-                    "$PROFILE" => format!( " \"{}\"", instance.profname.as_str()),
-                    "$WIDTH" => format!( " {gsc_width}"),
-                    "$HEIGHT" => format!( " {gsc_height}"),
-                    "$WIDTHXHEIGHT" => format!( " \"{gsc_width}x{gsc_height}\"", ),
-                    _ => format!( " {arg}"),
-                })
-                .collect::<String>(),
+            .args
+            .iter()
+            .map(|arg| match arg.as_str() {
+                "$GAMEDIR" => format!(" \"{gamedir}\""),
+                 "$PROFILE" => format!(" \"{}\"", instance.profname.as_str()),
+                 "$WIDTH" => format!(" {}", instance.width),
+                 "$HEIGHT" => format!(" {}", instance.height),
+                 "$WIDTHXHEIGHT" => format!(" \"{}x{}\"", instance.width, instance.height),
+                 _ => format!(" {arg}"),
+            })
+            .collect::<String>(),
             ExecRef(e) => e.args.clone().sanitize_path(),
         };
 
@@ -303,10 +312,11 @@ pub fn launch_cmd(
         if i < instances.len() - 1 {
             // Proton games need a ~5 second buffer in-between launches
             // TODO: investigate why this is
-            match win {
-                true => cmd.push_str("& sleep 6; "),
-                false => cmd.push_str("& sleep 0.01; "),
-            }
+            let pause_duration = match game {
+                HandlerRef(h) => h.pause_between_starts.unwrap_or(if win { 6.0 } else { 0.01 }),
+                ExecRef(_) => if win { 6.0 } else { 0.01 },
+            };
+            cmd.push_str(&format!("& sleep {pause_duration}; "));
         }
     }
 
