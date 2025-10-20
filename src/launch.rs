@@ -126,7 +126,13 @@ pub fn launch_cmds(
     }
 
     let mut cmds: Vec<Command> = (0..instances.len())
-        .map(|_| Command::new(gamescope))
+        .map(|_| {
+            if cfg.cpu_affinity > 0 {
+                Command::new("taskset")
+            } else {
+                Command::new(gamescope)
+            }
+        })
         .collect();
 
     for (i, instance) in instances.iter().enumerate() {
@@ -149,6 +155,14 @@ pub fn launch_cmds(
             });
 
         let cmd = &mut cmds[i];
+
+        if cfg.cpu_affinity > 0 {
+            let core_start = i as u32 * cfg.cpu_affinity;
+            let core_end = core_start + cfg.cpu_affinity - 1;
+            cmd.arg("-c");
+            cmd.arg(format!("{}-{}", core_start, core_end));
+            cmd.arg(gamescope);
+        }
 
         cmd.env("SDL_JOYSTICK_HIDAPI", "0");
         cmd.env("ENABLE_GAMESCOPE_WSI", "0");

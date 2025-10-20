@@ -501,6 +501,15 @@ impl PartyApp {
         }
         });
 
+        ui.horizontal(|ui| {
+            let cpu_affinity_label = ui.label("CPU threads per instance");
+            let cpu_affinity_dragvalue =
+                ui.add(egui::DragValue::new(&mut self.options.cpu_affinity).speed(1));
+            if cpu_affinity_label.hovered() || cpu_affinity_dragvalue.hovered() {
+                self.infotext = "DEFAULT: 4\n\nSet the number of CPU threads to allocate to each game instance. A value of 0 disables CPU affinity. For an 8-core/16-thread CPU, a value of 4 (2 cores) per instance is a good starting point for a 4-player game.".to_string();
+            }
+        });
+
         let proton_separate_pfxs_check = ui.checkbox(
             &mut self.options.proton_separate_pfxs,
             "Run instances in separate Proton prefixes",
