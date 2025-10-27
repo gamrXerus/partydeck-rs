@@ -1,0 +1,52 @@
+ CRITICAL: Use the official Steam Runtime Scout SDK image as the build container
+container: 
+  image: registry.gitlab.com/steamrt/sdk:scout
+
+steps:
+- name: Checkout repository
+  uses: actions/checkout@v4
+  with:
+    submodules: recursive # Keep this for Gamescope dependency
+
+- name: Prepare and Install Dependencies
+  # Note: We use 'apt-get' because the Scout image is Debian-based
+  run: |
+    # Install the Rust toolchain (minimal profile is sufficient)
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+    
+    # Add the rust environment to the path
+    source $HOME/.cargo/env
+    
+    # Install remaining system dependencies for the C/C++ part (like libudev-dev)
+    apt-get update && apt-get install -y \
+      meson ninja-build pkg-config libudev-dev cmake luajit \
+      libxcomposite-dev libxmu-dev libxrender-dev libxres-dev libxtst-dev \
+      libxkbcommon-dev libdrm-dev libinput-dev libdecor-dev libxdamage-dev \
+      libavif-dev libheif-dev libaom-dev librav1e-dev glslang-tools vulkan-headers
+      
+    # Note: wlroots0.18 and other specific package names from Arch
+    # might need adjustment for the older Debian Scout environment.
+    # I have added common Debian package names here.
+
+- name: Build Gamescope Dependency (if needed)
+  run: |
+    source $HOME/.cargo/env
+    cd deps/gamescope
+    export CC=gcc CXX=g++
+    # Using the host environment's compiler (which is the Scout GCC)
+    meson build-gcc/ -Dinput_emulation=disabled --werror --auto-features=enabled
+    ninja -C build-gcc/
+
+- name: Build PartyDeck-RS
+  run: |
+    source $HOME/.cargo/env
+    # Run your main build script
+    ./build.sh
+    
+- name: Upload Artifacts
+  uses: actions/upload-artifact@v4
+  with:
+    name: built-binaries-steamrt-scout
+    path: |
+      build/
+      deps/gamescope/build-gcc/src/gamescope
