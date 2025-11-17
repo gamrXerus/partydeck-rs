@@ -1,10 +1,11 @@
 use super::app::{MenuPage, PartyApp, SettingsPage};
 use super::config::*;
-use crate::handler::scan_handlers;
+use crate::handler::*;
 use crate::input::*;
 use crate::paths::*;
 use crate::profiles::*;
 use crate::util::*;
+use crate::monitor::get_monitors_sdl;
 
 use dialog::DialogBox;
 use eframe::egui::RichText;
@@ -25,10 +26,27 @@ impl PartyApp {
         ui.label("Press SELECT/BACK or Tab to unlock gamepad navigation.");
         ui.label("PartyDeck is in the very early stages of development; as such, you will likely encounter bugs, issues, and strange design decisions.");
         ui.label("For debugging purposes, it's recommended to read terminal output (stdout) for further information on errors.");
-        ui.label("If you have found this software useful, consider donating to support further development!");
-        ui.hyperlink_to("Ko-fi", "https://ko-fi.com/wunner");
-        ui.label("If you've encountered issues or want to suggest improvements, criticism and feedback are always appreciated!");
-        ui.hyperlink_to("GitHub", "https://github.com/wunnr/partydeck");
+        ui.separator();
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Thank you to");
+            ui.hyperlink_to("♥Ko-fi", "https://ko-fi.com/wunner");
+            ui.label("supporters:");
+        });
+        ui.label("Framilano, Jayden, Marc, Max Rei");
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Thank you to");
+            ui.hyperlink_to(" GitHub", "https://github.com/wunnr/partydeck");
+            ui.label("contributors:")
+        });
+        ui.horizontal_wrapped(|ui| {
+            ui.hyperlink_to("@Blahkaey", "https://github.com/Blahkaey");
+            ui.hyperlink_to("@blckink", "https://github.com/blckink");
+            ui.hyperlink_to("@felipecrs", "https://github.com/felipecrs");
+            ui.hyperlink_to("@framilano", "https://github.com/framilano");
+            ui.hyperlink_to("@Rudicito", "https://github.com/Rudicito");
+            ui.hyperlink_to("@Tau5", "https://github.com/Tau5");
+            ui.hyperlink_to("@Twig6943", "https://github.com/Twig6943");
+        });
     }
 
     pub fn display_page_settings(&mut self, ui: &mut Ui) {
@@ -169,7 +187,7 @@ impl PartyApp {
                     },
                 );
 
-            ui.checkbox(&mut h.use_goldberg, "Use Goldberg Steam Emu");
+            ui.checkbox(&mut h.use_goldberg, "Emulate Steam Client");
         });
 
         h.steam_appid = match &self.installed_steamapps[selected_index] {
@@ -211,11 +229,22 @@ impl PartyApp {
             ui.add(egui::TextEdit::singleline(&mut h.args));
         });
 
-        ui.horizontal(|ui| {
-            ui.label("Architecture:");
-            ui.radio_value(&mut h.is32bit, false, "64-bit");
-            ui.radio_value(&mut h.is32bit, true, "32-bit");
-        });
+        if !h.win() {
+            ui.horizontal(|ui| {
+                ui.label("SDL2 Override:");
+                ui.radio_value(&mut h.sdl2_override, SDL2Override::No, "None");
+                ui.radio_value(
+                    &mut h.sdl2_override,
+                    SDL2Override::Srt,
+                    "Steam Runtime (32-bit)",
+                );
+                ui.radio_value(
+                    &mut h.sdl2_override,
+                    SDL2Override::Sys,
+                    "System Installation",
+                );
+            });
+        }
 
         if !h.win() {
             ui.horizontal(|ui| {
@@ -224,6 +253,13 @@ impl PartyApp {
                 ui.radio_value(&mut h.runtime, "scout".to_string(), "1.0 (scout)");
                 ui.radio_value(&mut h.runtime, "soldier".to_string(), "2.0 (soldier)");
             });
+        }
+        
+        if h.spec_ver != HANDLER_SPEC_CURRENT_VERSION {
+            if ui.button("Update Handler Specification Version").clicked() {
+                h.spec_ver = HANDLER_SPEC_CURRENT_VERSION;
+                msg("Handler Specification Version Updated", "Remember to save your changes.");
+            }
         }
 
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
@@ -249,14 +285,27 @@ impl PartyApp {
         let h = cur_handler!(self);
 
         ui.horizontal(|ui| {
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_START.png")).max_height(16.0),
-            );
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_START_PS5.png"))
-                    .max_height(16.0),
-            );
-            if ui.button("Play").clicked() {
+            let playbtn = ui.add(egui::Button::image_and_text(
+                egui::include_image!("../../res/BTN_START.png"),
+                "Play",
+            ));
+            if playbtn.clicked() {
+                if h.spec_ver != HANDLER_SPEC_CURRENT_VERSION {
+                    let mismatch = match h.spec_ver < HANDLER_SPEC_CURRENT_VERSION {
+                        true => "an older",
+                        false => "a newer",
+                    };
+                    let mismatch2 = match h.spec_ver < HANDLER_SPEC_CURRENT_VERSION {
+                        true => "Up-to-date handlers can be found by clicking the ⮋ button on the top bar of the launcher.",
+                        false => "It is recommended to update PartyDeck to the latest version.",
+                    };
+                    msg(
+                        "Handler version mismatch",
+                        &format!("This handler was meant for use with {} version of PartyDeck; you may experience issues or the game may not work at all. {} If everything still works fine, you can prevent this message appearing in the future by editing the handler, updating the spec version and saving.",
+                            mismatch, mismatch2
+                        )
+                    );
+                }
                 if h.steam_appid.is_none() && h.path_gameroot.is_empty() {
                     msg(
                         "Game root path not found",
@@ -266,6 +315,8 @@ impl PartyApp {
                     self.cur_page = MenuPage::EditHandler;
                 } else {
                     self.instances.clear();
+                    self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+                    self.monitors = get_monitors_sdl();
                     self.profiles = scan_profiles(true);
                     self.instance_add_dev = None;
                     self.cur_page = MenuPage::Instances;
@@ -339,15 +390,6 @@ impl PartyApp {
             ui.label(remove_text);
 
             ui.add(egui::Separator::default().vertical());
-
-            if self.instances.len() > 0 && self.instance_add_dev == None {
-                ui.add(
-                    egui::Image::new(egui::include_image!("../../res/BTN_NORTH.png"))
-                        .max_height(12.0),
-                );
-                ui.label("[A]");
-                ui.label("Invite to Instance");
-            }
         });
 
         ui.separator();
@@ -376,14 +418,17 @@ impl PartyApp {
                 }
 
                 if self.instance_add_dev == None {
-                    if ui.button("➕ Invite New Device").clicked() {
+                    let invitebtn = ui.add(
+                        egui::Button::image_and_text(egui::include_image!("../../res/BTN_NORTH.png"), "[A] Invite New Device")
+                    );
+                    if invitebtn.clicked() {
                         self.instance_add_dev = Some(i);
                     }
                 } else if self.instance_add_dev == Some(i) {
-                    if ui.button("🗙 Cancel").clicked() {
+                    ui.label("Adding new device...");
+                    if ui.button("🗙").clicked() {
                         self.instance_add_dev = None;
                     }
-                    ui.label("Adding new device...");
                 }
             });
             for &dev in instance.devices.iter() {
@@ -398,7 +443,7 @@ impl PartyApp {
                 }
 
                 ui.horizontal(|ui| {
-                    ui.label("  ");
+                    ui.label("    ");
                     ui.label(dev_text);
                     if ui.button("🗑").clicked() {
                         devices_to_remove.push((i, dev));
@@ -418,10 +463,6 @@ impl PartyApp {
                         egui::Image::new(egui::include_image!("../../res/BTN_START.png"))
                             .max_height(16.0),
                     );
-                    ui.add(
-                        egui::Image::new(egui::include_image!("../../res/BTN_START_PS5.png"))
-                            .max_height(16.0),
-                    );
                     if ui.button("Start").clicked() {
                         self.prepare_game_launch();
                     }
@@ -432,11 +473,6 @@ impl PartyApp {
     }
 
     pub fn display_settings_general(&mut self, ui: &mut Ui) {
-        let force_sdl2_check = ui.checkbox(&mut self.options.force_sdl, "Force Steam Runtime SDL2");
-        if force_sdl2_check.hovered() {
-            self.infotext = "DEFAULT: Disabled\n\nForces games to use the version of SDL2 included in the Steam Runtime. Only works on native Linux games, may fix problematic game controller support (incorrect mappings) in some games, may break others. If unsure, leave this unchecked.".to_string();
-        }
-
         let enable_kwin_script_check = ui.checkbox(
             &mut self.options.enable_kwin_script,
             "(KDE) Automatically resize/reposition instances using KWin script",
@@ -520,7 +556,7 @@ impl PartyApp {
 
         let allow_multiple_instances_on_same_device_check = ui.checkbox(
             &mut self.options.allow_multiple_instances_on_same_device,
-            "Allow multiple instances on the same device",
+            "(Debug) Allow multiple instances from one gamepad",
         );
         if allow_multiple_instances_on_same_device_check.hovered() {
             self.infotext = "DEFAULT: Disabled\n\nAllow multiple instances on the same device. This can be useful for testing or when one person wants to control multiple instances.".to_string();

@@ -3,6 +3,7 @@ use crate::Handler;
 use crate::handler::import_pd2;
 use crate::handler::scan_handlers;
 use crate::input::*;
+use crate::monitor::get_monitors_sdl;
 use crate::profiles::scan_profiles;
 use crate::util::*;
 
@@ -19,62 +20,76 @@ macro_rules! cur_handler {
 impl PartyApp {
     pub fn display_panel_top(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_EAST.png")).max_height(12.0),
-            );
-
             let hometext = match self.is_lite() {
-                true => "Play",
-                false => "Home",
+                true => "▶",
+                false => "ℹ",
             };
             let homepage = match self.is_lite() {
                 true => MenuPage::Instances,
                 false => MenuPage::Home,
             };
-            ui.selectable_value(&mut self.cur_page, homepage, hometext);
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_NORTH.png")).max_height(12.0),
+
+            let homebtn = ui.add(
+                egui::Button::image_and_text(
+                    egui::include_image!("../../res/BTN_EAST.png"),
+                    hometext,
+                )
+                .selected(self.cur_page == MenuPage::Home),
             );
-            ui.selectable_value(&mut self.cur_page, MenuPage::Settings, "Settings");
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_WEST.png")).max_height(12.0),
+
+            if homebtn.clicked() {
+                self.cur_page = homepage;
+            }
+
+            let settingsbtn = ui.add(
+                egui::Button::image_and_text(egui::include_image!("../../res/BTN_NORTH.png"), "⛭")
+                    .selected(self.cur_page == MenuPage::Settings),
             );
-            if ui
-                .selectable_value(&mut self.cur_page, MenuPage::Profiles, "Profiles")
-                .clicked()
-            {
+            if settingsbtn.clicked() {
+                self.cur_page = MenuPage::Settings;
+            }
+
+            let profilesbtn = ui.add(
+                egui::Button::image_and_text(egui::include_image!("../../res/BTN_WEST.png"), "👥")
+                    .selected(self.cur_page == MenuPage::Profiles),
+            );
+            if profilesbtn.clicked() {
                 self.profiles = scan_profiles(false);
                 self.cur_page = MenuPage::Profiles;
             }
 
-            if ui.button("🎮 Rescan").clicked() {
+            if ui.button("🎮 🔄").clicked() {
                 self.instances.clear();
                 self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+            }
+            
+            if ui.button("🖵 🔄").clicked() {
+                self.instances.clear();
+                self.monitors = get_monitors_sdl();
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("❌ Quit").clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
+                ui.add(egui::Separator::default().vertical());
                 let version_label = match self.needs_update {
                     true => format!("v{} (Update Available)", env!("CARGO_PKG_VERSION")),
                     false => format!("v{}", env!("CARGO_PKG_VERSION")),
                 };
                 ui.hyperlink_to(version_label, "https://github.com/wunnr/partydeck/releases");
                 ui.add(egui::Separator::default().vertical());
+                ui.hyperlink_to("⮋", "https://drive.proton.me/urls/D9HBKM18YR#zG8XC8yVy9WL")
+                    .on_hover_text("Download Game Handlers");
+                ui.hyperlink_to("💰", "https://ko-fi.com/wunner")
+                    .on_hover_text("Support PartyDeck Development");
                 ui.hyperlink_to(
-                    "Licenses",
+                    "🖹",
                     "https://github.com/wunnr/partydeck/tree/main?tab=License-2-ov-file",
-                );
-                ui.add(egui::Separator::default().vertical());
-                ui.hyperlink_to(
-                    "Handlers",
-                    "https://drive.proton.me/urls/D9HBKM18YR#zG8XC8yVy9WL",
-                );
-                ui.add(egui::Separator::default().vertical());
-                ui.hyperlink_to("Donate", "https://ko-fi.com/wunner");
-                ui.add(egui::Separator::default().vertical());
-                ui.hyperlink_to("GitHub", "https://github.com/wunnr/partydeck");
+                )
+                .on_hover_text("Third-Party Licenses");
+                ui.hyperlink_to("", "https://github.com/wunnr/partydeck")
+                    .on_hover_text("GitHub");
             });
         });
     }
@@ -143,7 +158,7 @@ impl PartyApp {
                 "{} {} ({})",
                 pad.emoji(),
                 pad.fancyname(),
-                pad.path()
+                pad.path().trim_start_matches("/dev/input/event")
             ))
             .small();
 
@@ -158,7 +173,7 @@ impl PartyApp {
 
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
             ui.link("ℹ Incorrect/missing controller mappings in-game?").on_hover_ui(|ui| {
-                ui.label("Some native Linux games run using an older version of SDL2 that doesn't support newer controllers; enabling \"Force Steam Runtime SDL2\" in PartyDeck's settings may help.");
+                ui.label("Some native Linux games run using an older version of SDL2 that doesn't support newer controllers; you can edit the handler and change the SDL2 Override setting to \"Steam Runtime\" for older 32-bit games, or \"System Installation\" for 64-bit games.\n\nWindows Unity-based games may not recognize input from PlayStation controllers; the current workaround for this is to use them through Steam Input, and change PartyDeck controller filter setting to \"Only Steam Input\".");
             });
             ui.link("ℹ Devices not being detected?").on_hover_ui(|ui| {
                 ui.style_mut().interaction.selectable_labels = true;
