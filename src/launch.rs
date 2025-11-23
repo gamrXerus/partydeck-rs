@@ -66,8 +66,51 @@ pub fn launch_game(
         i += 1;
     }
 
+    let mut monitoring_devices: Vec<InputDevice> = Vec::new();
+    for info in input_devices {
+        if info.device_type == DeviceType::Gamepad {
+            if let Ok(dev) = InputDevice::from_info(info) {
+                monitoring_devices.push(dev);
+            }
+        }
+    }
+
+    loop {
+        let mut all_finished = true;
+        let mut kill_all = false;
+
+        for dev in &mut monitoring_devices {
+            if let Some(PadButton::Guide) = dev.poll() {
+                kill_all = true;
+                break;
+            }
+        }
+
+        if kill_all {
+            println!("[partydeck] Guide button pressed, quitting all instances...");
+            for handle in &mut handles {
+                let _ = handle.kill();
+            }
+            break;
+        }
+
+        for handle in &mut handles {
+            match handle.try_wait() {
+                Ok(Some(_)) => {}
+                Ok(None) => all_finished = false,
+                Err(_) => {}
+            }
+        }
+
+        if all_finished {
+            break;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
     for mut handle in handles {
-        handle.wait()?;
+        let _ = handle.wait();
     }
 
     Ok(())

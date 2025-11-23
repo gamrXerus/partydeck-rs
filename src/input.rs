@@ -21,6 +21,7 @@ pub enum PadButton {
     YBtn,
     StartBtn,
     SelectBtn,
+    Guide,
 
     AKey,
     RKey,
@@ -84,6 +85,17 @@ impl InputDevice {
             device_type: self.device_type(),
         }
     }
+    pub fn from_info(info: &DeviceInfo) -> Result<Self, std::io::Error> {
+        let dev = Device::open(&info.path)?;
+        dev.set_nonblocking(true)?;
+        Ok(InputDevice {
+            path: info.path.clone(),
+            dev,
+            enabled: info.enabled,
+            device_type: info.device_type,
+            has_button_held: false,
+        })
+    }
     pub fn poll(&mut self) -> Option<PadButton> {
         let mut btn: Option<PadButton> = None;
         if let Ok(events) = self.dev.fetch_events() {
@@ -107,6 +119,7 @@ impl InputDevice {
                     EventSummary::Key(_, KeyCode::BTN_WEST, 1) => Some(PadButton::YBtn),
                     EventSummary::Key(_, KeyCode::BTN_START, 1) => Some(PadButton::StartBtn),
                     EventSummary::Key(_, KeyCode::BTN_SELECT, 1) => Some(PadButton::SelectBtn),
+                    EventSummary::Key(_, KeyCode::BTN_MODE, 1) => Some(PadButton::Guide),
                     EventSummary::AbsoluteAxis(_, AbsoluteAxisCode::ABS_HAT0X, -1) => {
                         Some(PadButton::Left)
                     }
